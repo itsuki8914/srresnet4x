@@ -8,8 +8,8 @@ this implementation is not GAN.
 
 input
 
-<img src = 'ouput/0_xval.png' >
+<img src = 'output/0_xval.png' >
 
 output
 
-<img src = 'ouput/o_yval.png'>
+<img src = 'output/o_yval.png'>

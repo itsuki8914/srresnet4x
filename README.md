@@ -6,10 +6,8 @@ I referrd this paper:https://arxiv.org/abs/1609.04802
 this implementation is not GAN.
 
 
-input
+left:input right:output
 
-<img src = 'output/0_xval.png' >
+<img src = 'output/0_val.png' >
 
-output
 
-<img src = 'output/1_yval.png'>

@@ -4,3 +4,12 @@ the attached model is supesialized in cartoons.
 
 I referrd this paper:https://arxiv.org/abs/1609.04802
 this implementation is not GAN.
+
+
+input
+
+<img src = 'ouput/0_xval.png' >
+
+output
+
+<img src = 'ouput/o_yval.png'>

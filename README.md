@@ -12,4 +12,4 @@ input
 
 output
 
-<img src = 'output/o_yval.png'>
+<img src = 'output/0_yval.png'>

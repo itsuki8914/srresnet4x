@@ -8,8 +8,10 @@ This implementation substitutes subpixel-convolution with deconvolution because 
 
 this implementation is not GAN.
 
+
+## example
 left:nearest right:output
 
-<img src = 'output/114_val.png' >
+<img src = 'output/115_val.png' >
 
 

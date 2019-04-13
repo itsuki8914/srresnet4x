@@ -10,6 +10,7 @@ def _fc_variable( weight_shape,name="fc"):
         output_channels = int(weight_shape[1])
         weight_shape    = (input_channels, output_channels)
         regularizer = tf.contrib.layers.l2_regularizer(scale=REGULARIZER_COF)
+
         # define variables
         weight = tf.get_variable("w", weight_shape     ,
                                 initializer=tf.contrib.layers.xavier_initializer(),
@@ -34,27 +35,44 @@ def _conv_variable( weight_shape,name="conv"):
         bias   = tf.get_variable("b", [output_channels],
                                 initializer=tf.constant_initializer(0.0))
     return weight, bias
+def _deconv_variable( weight_shape,name="conv"):
+    with tf.variable_scope(name):
+        # check weight_shape
+        w = int(weight_shape[0])
+        h = int(weight_shape[1])
+        output_channels = int(weight_shape[2])
+        input_channels  = int(weight_shape[3])
+        weight_shape = (w,h,input_channels, output_channels)
+        regularizer = tf.contrib.layers.l2_regularizer(scale=REGULARIZER_COF)
+        # define variables
+        weight = tf.get_variable("w", weight_shape    ,
+                                initializer=tf.contrib.layers.xavier_initializer_conv2d(),
+                                regularizer=regularizer)
+        bias   = tf.get_variable("b", [input_channels], initializer=tf.constant_initializer(0.0))
+    return weight, bias
 
 def _conv2d( x, W, stride):
     return tf.nn.conv2d(x, W, strides = [1, stride, stride, 1], padding = "SAME")
 
-def pixel_shuffle_layer(x, r, n_split, name="PS"):
-    with tf.variable_scope(name):
-        def PS(x, r):
-            bs, a, b, c = x.get_shape().as_list()
+def _deconv2d( x, W, output_shape, stride=1):
+    # x           : [nBatch, height, width, in_channels]
+    # output_shape: [nBatch, height, width, out_channels]
+    return tf.nn.conv2d_transpose(x, W, output_shape=output_shape, strides=[1,stride,stride,1], padding = "SAME",data_format="NHWC")
 
-            bs = tf.shape(x)[0]
+def _conv_layer(x, input_layer, output_layer, stride, filter_size=3, name="conv", isTraining=True):
+    conv_w, conv_b = _conv_variable([filter_size,filter_size,input_layer,output_layer],name="conv"+name)
+    h = _conv2d(x,conv_w,stride=stride) + conv_b
+    h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="gNormc"+name)
+    h = tf.nn.leaky_relu(h)
+    return h
 
-            x = tf.reshape(x, (bs, a, b, r, r))
-            x = tf.transpose(x, (0, 1, 2, 4, 3))
-            x = tf.split(x, a, 1)
-            x = tf.concat([tf.squeeze(x_,axis=1) for x_ in x], 2)
-            x = tf.split(x, b, 1)
-            x = tf.concat([tf.squeeze(x_,axis=1) for x_ in x], 2)
-            return tf.reshape(x, (bs, a*r, b*r, 1))
-
-        xc = tf.split(x, n_split, 3)
-    return tf.concat([PS(x_, r) for x_ in xc], 3)
+def _deconv_layer(x,input_layer, output_layer, stride=2, filter_size=3, name="deconv", isTraining=True):
+    bs, h, w, c = x.get_shape().as_list()
+    deconv_w, deconv_b = _deconv_variable([filter_size,filter_size,input_layer,output_layer],name="deconv"+name )
+    h = _deconv2d(x,deconv_w, output_shape=[bs,h*2,w*2,output_layer], stride=stride) + deconv_b
+    h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="gNormd"+name)
+    h = tf.nn.leaky_relu(h)
+    return h
 
 def buildSRGAN_g(x,reuse=False,isTraining=True,nBatch=64):
 
@@ -79,32 +97,20 @@ def buildSRGAN_g(x,reuse=False,isTraining=True,nBatch=64):
             nn = tf.math.add(h,nn, name="resadd%s" % i)
             h = nn
 
-        conv_w, conv_b = _conv_variable([3,3,64,64],name="conv3_g" )
-        h = _conv2d(h,conv_w,stride=1) + conv_b
-        h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="Norm3_g")
-        h = tf.nn.leaky_relu(h)
+        h = _conv_layer(h,64,64,1,3,name="3_g", isTraining=isTraining)
         h = tf.math.add(tmp,h, name="add")
 
-        conv_w, conv_b = _conv_variable([3,3,64,256],name="conv2_g" )
-        h = _conv2d(h,conv_w,stride=1) + conv_b
-        h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="Norm2_g")
-        h = tf.nn.leaky_relu(h)
+        h = _conv_layer(h, 64, 256, 1, 3, "2_g", isTraining=isTraining)
 
-        h = pixel_shuffle_layer(h, 2, 64)
+        h = _deconv_layer(h, 256, 128, 2, 3, "2_g", isTraining=isTraining)
 
-        conv_w, conv_b = _conv_variable([3,3,64,256],name="conv1_g" )
-        h = _conv2d(h,conv_w,stride=1) + conv_b
-        h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="Norm1_g")
-        h = tf.nn.leaky_relu(h)
+        h = _conv_layer(h, 128, 128, 1, 3, "1_g", isTraining=isTraining)
 
-        h = pixel_shuffle_layer(h, 2, 64)
+        h = _deconv_layer(h, 128, 64, 2, 3, "1_g", isTraining=isTraining)
 
-        conv_w, conv_b = _conv_variable([3,3,64,64],name="conv0_g" )
-        h = _conv2d(h,conv_w,stride=1) + conv_b
-        h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="Norm0_g")
-        h = tf.nn.leaky_relu(h)
+        h = _conv_layer(h, 64, 64, 1, 3, "0_g", isTraining=isTraining)
 
-        conv_w, conv_b = _conv_variable([3,3,64,3],name="convo_g" )
+        conv_w, conv_b = _conv_variable([7,7,64,3],name="convo_g" )
         h = _conv2d(h,conv_w,stride=1) + conv_b
         y = tf.nn.tanh(h)
 

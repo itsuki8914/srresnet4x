@@ -10,7 +10,7 @@ from model import *
 DATASET_DIR = "data"
 VAL_DIR ="val"
 SAVE_DIR = "model"
-OUT_DIR = "ouput"
+OUT_DIR = "output"
 UNLIMIT = True
 
 def main(folder="test"):
@@ -20,24 +20,25 @@ def main(folder="test"):
         os.makedirs(OUT_DIR)
     folder=folder
     files = os.listdir(folder)
-    img_size =512
+    img_size = 576
     bs =8
     val_size =2
 
     start = time.time()
 
-    x = tf.placeholder(tf.float32, [None, img_size, img_size, 3])
+    x = tf.placeholder(tf.float32, [1, img_size, img_size, 3])
     y =buildSRGAN_g(x,nBatch=bs,isTraining=False)
 
     print("%.4e sec took building model"%(time.time()-start))
 
     sess = tf.Session()
     saver = tf.train.Saver()
+    #summary = tf.summary.merge_all()
 
     ckpt = tf.train.get_checkpoint_state('model')
     if ckpt: # checkpointがある場合
-        last_model = ckpt.all_model_checkpoint_paths[3]
-        #last_model = ckpt.model_checkpoint_path # 最後に保存したmodelへのパス
+        #last_model = ckpt.all_model_checkpoint_paths[1]
+        last_model = ckpt.model_checkpoint_path # 最後に保存したmodelへのパス
         print ("load " + last_model)
         saver.restore(sess, last_model) # 変数データの読み込み
         print("succeed restore model")
@@ -48,7 +49,9 @@ def main(folder="test"):
     print("%.4e sec took initializing"%(time.time()-start))
 
     start = time.time()
-
+    #
+    folder="test"
+    files = os.listdir(folder)
     for i in range(len(files)):
 
         print(files[i])
@@ -63,19 +66,23 @@ def main(folder="test"):
                 h = h*img_size//maxl
                 w = w*img_size//maxl
                 img =cv2.resize(img,(w,h))
-        """
+
         if h > img_size or w > img_size:
             print("height={} and weight={} both must be lower than {}".format(h,w,img_size))
-            #continue
-        """
+            continue
         input = np.zeros((img_size,img_size,3))
+        #input = np.random.normal(0,0.1,(img_size,img_size,3))
         input[:h,:w]=img
         input= input.reshape(1,img_size,img_size,3)
 
         out = sess.run(y,feed_dict={x:input})
-        X_ = cv2.resize(img,(w*4,h*4),interpolation = cv2.INTER_CUBIC)
+        #out = y.eval(feed_dict={x:input})
+        #input=input.reshape(img_size,img_size,3)
+        #X_ = cv2.resize(img,(w*4,h*4),interpolation = cv2.INTER_CUBIC)
+        X_ = cv2.resize(img,(w*4,h*4),interpolation = cv2.INTER_NEAREST)
 
         out = out.reshape(img_size*4,img_size*4,3)
+        #print(out.shape)
         Y_ = out[:h*4,:w*4]
         print("output shape is ",Y_.shape)
 
@@ -85,7 +92,7 @@ def main(folder="test"):
         cv2.imwrite("{}/{}_yval.png".format(OUT_DIR, i), Y_)
         Z_ = np.concatenate((X_,Y_), axis=1)
 
-        cv2.imwrite("{}/{}_val.png".format(OUT_DIR, i),Z_)
+        cv2.imwrite("{}/{}_val.png".format(OUT_DIR,i), Z_)
 
     print("%.4e sec took for predicting" %(time.time()-start))
 

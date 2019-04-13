@@ -23,20 +23,20 @@ like this
 main.py
 pred.py
 data
-  ├ 000.jpg
+  ├ 000.png
   ├ aaa.png
   ...
-  └ zzz.jpg
+  └ zzz.png
 val
-  ├ 111.jpg
+  ├ 111.png
   ├ bbb.png
   ...
-  └ xxx.jpg
+  └ xxx.png
 test
-  ├ 222.jpg
+  ├ 222.png
   ├ ccc.png
   ...
-  └ yyy.jpg 
+  └ yyy.png
 ```
 
 
